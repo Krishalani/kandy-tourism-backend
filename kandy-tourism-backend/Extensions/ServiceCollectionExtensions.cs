@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICatalogService, CatalogService>();
         services.AddScoped<IItineraryService, ItineraryService>();
         services.AddScoped<IAdminAuthService, AdminAuthService>();
+        services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         return services;
     }

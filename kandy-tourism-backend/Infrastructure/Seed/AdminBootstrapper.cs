@@ -1,9 +1,8 @@
+using KandyTourism.Api.Application.DTOs;
+using KandyTourism.Api.Application.Interfaces;
 using KandyTourism.Api.Application.Services;
 using KandyTourism.Api.Configuration;
-using KandyTourism.Api.Domain.Entities;
-using KandyTourism.Api.Infrastructure.Persistence;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
+using KandyTourism.Api.Domain.Exceptions;
 using Microsoft.Extensions.Options;
 
 namespace KandyTourism.Api.Infrastructure.Seed;
@@ -11,16 +10,14 @@ namespace KandyTourism.Api.Infrastructure.Seed;
 /// <summary>
 /// Creates the first admin from <c>BootstrapAdmin</c> settings (user-secrets or environment variables).
 /// No credentials are ever seeded from source code, and an existing account is never modified.
+/// Further admins are created by a signed-in admin through <c>POST /api/v1/admin/users</c>.
 /// </summary>
 public sealed class AdminBootstrapper(
-    KandyTourismDbContext db,
-    IPasswordHasher<AdminUser> passwordHasher,
+    IAdminUserService admins,
+    IAdminUserRepository users,
     IOptions<BootstrapAdminOptions> options,
-    TimeProvider clock,
     ILogger<AdminBootstrapper> logger)
 {
-    public const int MinimumPasswordLength = 12;
-
     public async Task EnsureAdminAsync(CancellationToken ct = default)
     {
         var settings = options.Value;
@@ -28,33 +25,26 @@ public sealed class AdminBootstrapper(
         {
             return;
         }
-        if (settings.Password.Length < MinimumPasswordLength)
-        {
-            logger.LogError("BootstrapAdmin:Password must be at least {Length} characters. The admin account was not created.",
-                MinimumPasswordLength);
-            return;
-        }
 
-        var normalizedEmail = AdminAuthService.NormalizeEmail(settings.Email);
-        if (await db.AdminUsers.AnyAsync(u => u.NormalizedEmail == normalizedEmail, ct))
+        if (await users.GetByNormalizedEmailAsync(AdminAuthService.NormalizeEmail(settings.Email), ct) is not null)
         {
             logger.LogInformation("The bootstrap admin account already exists; BootstrapAdmin settings can be removed.");
             return;
         }
 
-        var now = clock.GetUtcNow().UtcDateTime;
-        var admin = new AdminUser
+        try
         {
-            Email = settings.Email.Trim(),
-            NormalizedEmail = normalizedEmail,
-            DisplayName = settings.DisplayName.Trim(),
-            Role = AdminUser.AdminRole,
-            CreatedAtUtc = now,
-            UpdatedAtUtc = now,
-        };
-        admin.PasswordHash = passwordHasher.HashPassword(admin, settings.Password);
-        db.AdminUsers.Add(admin);
-        await db.SaveChangesAsync(ct);
-        logger.LogInformation("Created admin account {AdminId} from BootstrapAdmin settings.", admin.Id);
+            var admin = await admins.CreateAsync(new CreateAdminRequest
+            {
+                Email = settings.Email,
+                DisplayName = settings.DisplayName,
+                Password = settings.Password,
+            }, ct);
+            logger.LogInformation("Created admin account {AdminId} from BootstrapAdmin settings.", admin.Id);
+        }
+        catch (BusinessRuleException error)
+        {
+            logger.LogError("BootstrapAdmin settings are invalid ({Reason}). The admin account was not created.", error.Message);
+        }
     }
 }

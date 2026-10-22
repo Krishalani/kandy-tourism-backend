@@ -1,5 +1,6 @@
 using KandyTourism.Api.Application.DTOs;
 using KandyTourism.Api.Application.Interfaces;
+using KandyTourism.Api.Application.Mapping;
 using KandyTourism.Api.Domain.Entities;
 using KandyTourism.Api.Domain.Exceptions;
 using Microsoft.AspNetCore.Identity;
@@ -48,7 +49,7 @@ public sealed class AdminAuthService(
 
         var (token, expiresAtUtc) = tokens.CreateToken(user);
         logger.LogInformation("Admin {AdminId} signed in.", user.Id);
-        return new LoginResponse(token, "Bearer", expiresAtUtc, ToProfile(user));
+        return new LoginResponse(token, "Bearer", expiresAtUtc, user.ToProfileDto());
     }
 
     public async Task<AdminProfileDto> GetProfileAsync(int adminId, CancellationToken ct)
@@ -58,10 +59,8 @@ public sealed class AdminAuthService(
         {
             throw new UnauthorizedException("session-invalid", "Your admin session is no longer valid. Please sign in again.");
         }
-        return ToProfile(user);
+        return user.ToProfileDto();
     }
-
-    private static AdminProfileDto ToProfile(AdminUser user) => new(user.Id, user.Email, user.DisplayName, user.Role);
 
     private static UnauthorizedException InvalidCredentials() =>
         new("invalid-credentials", "The email or password is incorrect.");

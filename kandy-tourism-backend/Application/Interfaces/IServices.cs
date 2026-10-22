@@ -41,6 +41,12 @@ public interface IAdminAuthService
     Task<AdminProfileDto> GetProfileAsync(int adminId, CancellationToken ct);
 }
 
+public interface IAdminUserService
+{
+    /// <summary>Creates an active admin account with a hashed password.</summary>
+    Task<AdminProfileDto> CreateAsync(CreateAdminRequest request, CancellationToken ct);
+}
+
 public interface IAdminDashboardService
 {
     Task<AdminDashboardDto> GetAsync(CancellationToken ct);

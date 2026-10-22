@@ -78,6 +78,28 @@ public sealed class AdminAttractionsController(IAttractionService attractions) :
     }
 }
 
+/// <summary>Admin account management. There is no public sign-up: only a signed-in admin can add admins.</summary>
+[ApiController]
+[Route("api/v1/admin/users")]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public sealed class AdminUsersController(IAdminUserService admins, ILogger<AdminUsersController> logger) : ControllerBase
+{
+    /// <summary>Creates another admin account (password at least 12 characters).</summary>
+    [HttpPost]
+    [ProducesResponseType<AdminProfileDto>(StatusCodes.Status201Created)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<AdminProfileDto>> Create(CreateAdminRequest request, CancellationToken ct)
+    {
+        var created = await admins.CreateAsync(request, ct);
+        logger.LogInformation("Admin {CreatorId} created admin account {AdminId}.",
+            User.FindFirstValue(JwtRegisteredClaimNames.Sub), created.Id);
+        return StatusCode(StatusCodes.Status201Created, created);
+    }
+}
+
 [ApiController]
 [Route("api/v1/admin/dashboard")]
 [Authorize(Policy = ServiceCollectionExtensions.AdminPolicy)]

@@ -86,7 +86,8 @@ dotnet user-secrets set "BootstrapAdmin:Password" "<at least 12 characters>"
 The API refuses to start without `Jwt:SigningKey`. The bootstrap admin is created once; the
 password is hashed and never logged. After the first start you can remove the
 `BootstrapAdmin:Password` secret (`dotnet user-secrets remove "BootstrapAdmin:Password"`). No admin
-credentials exist in source code or seed data.
+credentials exist in source code or seed data. Once signed in, an admin can add further admins
+with `POST /api/v1/admin/users`; there is no public sign-up.
 
 ### 3. Database
 
@@ -177,6 +178,7 @@ Google Maps directions link.
 |---|---|---|
 | `POST /auth/login` | `{ email, password }` → `{ accessToken, tokenType, expiresAtUtc, admin }` | 200, 400, 401 (generic message), 429 (5 attempts/min/IP) |
 | `GET /auth/me` | Current admin | 200, 401 |
+| `POST /admin/users` | Create another admin: `{ email, displayName, password }` (password ≥ 12 chars) → `{ id, email, displayName, role }` | 201, 400, 401, 403, 409 `admin-email-taken` |
 | `GET /admin/dashboard` | Totals, per-category counts, guest plan counts | 200, 401, 403 |
 | `GET /admin/attractions/{id}` | Record for the edit form | 200, 404 |
 | `POST /admin/attractions` | Create (`AttractionUpsertRequest`) | 201, 400, 409 `slug-taken` |
