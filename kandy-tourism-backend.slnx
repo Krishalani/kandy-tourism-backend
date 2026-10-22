@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="kandy-tourism-backend/kandy-tourism-backend.csproj" />
+  <Project Path="KandyTourism.Api.Tests/KandyTourism.Api.Tests.csproj" />
+</Solution>
