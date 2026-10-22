@@ -9,8 +9,6 @@ admin attraction management with JWT bearer authentication.
 | Runtime | .NET 10 (SDK 10.0.401 tested), ASP.NET Core 10, EF Core 10.0.13 |
 | Database | SQL Server — LocalDB for development (SQL Server 2025 LocalDB tested) |
 | API docs | OpenAPI at `/openapi/v1.json`, Swagger UI at `/swagger` (Development only) |
-| Tests | xUnit: service tests on in-memory SQLite, HTTP integration tests on LocalDB |
-
 ## Project layout
 
 ```
@@ -34,7 +32,6 @@ kandy-tourism-backend/              API project (namespace KandyTourism.Api)
 ├── Middleware/                     Exception → problem details
 ├── Extensions/                     Service registration, startup database initialisation
 └── Configuration/                  Typed options
-KandyTourism.Api.Tests/             xUnit tests
 ```
 
 ## Database schema
@@ -132,8 +129,7 @@ There are two equivalent ways to load it:
   one transaction and resolves foreign keys by slug, so it is safe to run repeatedly.
 
 The SQL file is generated from `SeedData.cs`. After changing seed data, regenerate it with
-`dotnet run -- generate-seed-sql` (from `kandy-tourism-backend/`); a unit test fails if the
-committed script is out of date.
+`dotnet run -- generate-seed-sql` (from `kandy-tourism-backend/`) so the two stay identical.
 
 ## API (v1)
 
@@ -187,20 +183,6 @@ Google Maps directions link.
 
 Tokens expire after `Jwt:AccessTokenMinutes` (60). Each authenticated request re-checks that the
 admin account is still active.
-
-## Tests
-
-```powershell
-dotnet test kandy-tourism-backend.slnx
-```
-
-- `Services/` — attraction search/filter/sort/paging, validation, slug rules, itinerary add /
-  duplicate / limit / remove / reorder (including invalid permutations) / start point / access
-  token rules / deactivated attractions, admin sign-in, seed data and the generated SQL script.
-- `Integration/` — real HTTP calls against a throwaway LocalDB database created by the
-  migrations (dropped afterwards): response shapes, validation problem details, guest plan
-  persistence and access, admin authentication and protected CRUD, CORS, and running the SQL seed
-  script twice on a migrations-only database. These tests need LocalDB.
 
 ## Deployment notes
 

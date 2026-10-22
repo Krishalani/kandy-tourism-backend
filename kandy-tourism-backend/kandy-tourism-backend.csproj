@@ -24,10 +24,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="KandyTourism.Api.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
     <None Include="Infrastructure\SqlScripts\**\*.sql" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

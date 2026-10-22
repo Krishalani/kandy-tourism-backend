@@ -8,8 +8,8 @@ namespace KandyTourism.Api.Infrastructure.Seed;
 
 /// <summary>
 /// Generates <c>Infrastructure/SqlScripts/SeedKandyAttractions.sql</c> from <see cref="SeedData"/>, so the
-/// standalone script and the runtime seeder can never drift apart. A unit test fails if the committed
-/// script differs from this output; regenerate it with <c>dotnet run -- generate-seed-sql</c>.
+/// standalone script and the runtime seeder can never drift apart. Regenerate the committed script with
+/// <c>dotnet run -- generate-seed-sql</c> after changing <see cref="SeedData"/>.
 /// </summary>
 public static class SeedSqlScriptGenerator
 {
