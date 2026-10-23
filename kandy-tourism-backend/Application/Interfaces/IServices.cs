@@ -33,6 +33,12 @@ public interface IItineraryService
     Task<ItineraryDto> RemoveStopAsync(Guid id, string? accessToken, int attractionId, CancellationToken ct);
     Task<ItineraryDto> ReorderStopsAsync(Guid id, string? accessToken, ReorderStopsRequest request, CancellationToken ct);
     Task<ItineraryDto> ClearStopsAsync(Guid id, string? accessToken, CancellationToken ct);
+    Task<ItineraryDto> UpdateTripDateAsync(Guid id, string? accessToken, UpdateTripDateRequest request, CancellationToken ct);
+    /// <summary>Creates the plan's read-only share link if it doesn't have one yet.</summary>
+    Task<ItineraryDto> EnableSharingAsync(Guid id, string? accessToken, CancellationToken ct);
+    /// <summary>Removes the share link; anyone who has it can no longer open the plan.</summary>
+    Task<ItineraryDto> DisableSharingAsync(Guid id, string? accessToken, CancellationToken ct);
+    Task<SharedItineraryDto> GetSharedAsync(Guid shareId, CancellationToken ct);
 }
 
 public interface IAdminAuthService

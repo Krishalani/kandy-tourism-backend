@@ -70,4 +70,35 @@ public sealed class ItinerariesController(IItineraryService itineraries) : Contr
     [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
     public Task<ItineraryDto> ClearStops(Guid id, [FromHeader(Name = TokenHeader)] string? token, CancellationToken ct) =>
         itineraries.ClearStopsAsync(id, token, ct);
+
+    /// <summary>Sets the trip day (today up to a year ahead), or clears it with <c>null</c>.</summary>
+    [HttpPut("{id:guid}/trip-date")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    public Task<ItineraryDto> UpdateTripDate(Guid id, [FromHeader(Name = TokenHeader)] string? token,
+        UpdateTripDateRequest request, CancellationToken ct) => itineraries.UpdateTripDateAsync(id, token, request, ct);
+
+    /// <summary>Turns on a read-only share link (idempotent). The returned plan includes its <c>shareId</c>.</summary>
+    [HttpPost("{id:guid}/share")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    public Task<ItineraryDto> EnableSharing(Guid id, [FromHeader(Name = TokenHeader)] string? token,
+        CancellationToken ct) => itineraries.EnableSharingAsync(id, token, ct);
+
+    /// <summary>Turns the share link off; the old link stops working.</summary>
+    [HttpDelete("{id:guid}/share")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    public Task<ItineraryDto> DisableSharing(Guid id, [FromHeader(Name = TokenHeader)] string? token,
+        CancellationToken ct) => itineraries.DisableSharingAsync(id, token, ct);
+}
+
+/// <summary>Read-only access to plans their owners have chosen to share. No token is needed.</summary>
+[ApiController]
+[Route("api/v1/shared-itineraries")]
+[ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+public sealed class SharedItinerariesController(IItineraryService itineraries) : ControllerBase
+{
+    [HttpGet("{shareId:guid}")]
+    [ProducesResponseType<SharedItineraryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status404NotFound)]
+    public Task<SharedItineraryDto> Get(Guid shareId, CancellationToken ct) => itineraries.GetSharedAsync(shareId, ct);
 }

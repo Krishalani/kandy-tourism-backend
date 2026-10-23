@@ -24,6 +24,15 @@ public class Itinerary
 
     public List<ItineraryStop> Stops { get; set; } = [];
 
+    /// <summary>The day the guest plans to make the trip (Sri Lanka date), if they have chosen one.</summary>
+    public DateOnly? TripDate { get; set; }
+
+    /// <summary>
+    /// Public ID of a read-only share link, set while sharing is switched on. It is separate from
+    /// <see cref="PublicId"/> so a shared link never grants edit access.
+    /// </summary>
+    public Guid? ShareId { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

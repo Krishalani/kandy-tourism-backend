@@ -29,7 +29,27 @@ public sealed record ItineraryDto
     /// <summary>Stops in the tourist's chosen visiting order.</summary>
     public IReadOnlyList<ItineraryStopDto> Stops { get; init; } = [];
     public int MaxStops { get; init; }
+    /// <summary>The planned day of the trip, if chosen.</summary>
+    public DateOnly? TripDate { get; init; }
+    /// <summary>Set while a read-only share link is active (<c>GET /api/v1/shared-itineraries/{shareId}</c>).</summary>
+    public Guid? ShareId { get; init; }
     public DateTime UpdatedAtUtc { get; init; }
+}
+
+/// <summary>A read-only view of a shared plan. It carries no ID or token that could change the plan.</summary>
+public sealed record SharedItineraryDto
+{
+    public Guid ShareId { get; init; }
+    public ItineraryStartDto Start { get; init; } = new();
+    public IReadOnlyList<ItineraryStopDto> Stops { get; init; } = [];
+    public DateOnly? TripDate { get; init; }
+    public DateTime UpdatedAtUtc { get; init; }
+}
+
+public sealed record UpdateTripDateRequest
+{
+    /// <summary>The trip day (yyyy-MM-dd), from today up to a year ahead; null clears it.</summary>
+    public DateOnly? TripDate { get; init; }
 }
 
 /// <summary>Returned once, on creation. The client must keep the token to access the plan.</summary>

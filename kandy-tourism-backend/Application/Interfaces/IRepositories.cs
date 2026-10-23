@@ -56,6 +56,8 @@ public interface IItineraryRepository
 {
     /// <summary>Tracked itinerary with stops (and their attractions/categories) and start references loaded.</summary>
     Task<Itinerary?> GetByPublicIdAsync(Guid publicId, CancellationToken ct);
+    /// <summary>Read-only itinerary (same graph as <see cref="GetByPublicIdAsync"/>) for an active share link.</summary>
+    Task<Itinerary?> GetByShareIdAsync(Guid shareId, CancellationToken ct);
     Task<(int Itineraries, int ActiveStops)> GetCountsAsync(CancellationToken ct);
     void Add(Itinerary itinerary);
     void RemoveStop(ItineraryStop stop);

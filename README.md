@@ -42,7 +42,7 @@ kandy-tourism-backend/              API project (namespace KandyTourism.Api)
 | `Attractions` | Catalogue. `Slug` unique among **active** rows (filtered index). Description, visitor tips and tags are JSON arrays. `SearchText` holds the normalised name/area/category/tags for keyword search. Deleting sets `IsActive = 0`. FK to category is `RESTRICT`. |
 | `AttractionImages` | Gallery photos (URL, alt text, credit, sort order); cascade with the attraction. Images are hotlinked from Wikimedia Commons. |
 | `StartPresets` | Predefined starting points (one `IsDefault`). |
-| `Itineraries` | Guest plans: public `Guid`, SHA-256 hash of the access token, start (preset / attraction / typed text). |
+| `Itineraries` | Guest plans: public `Guid`, SHA-256 hash of the access token, start (preset / attraction / typed text), optional `TripDate` and optional `ShareId` (unique while set) for a read-only share link. |
 | `ItineraryStops` | Ordered stops. Unique `(ItineraryId, AttractionId)` and `(ItineraryId, Sequence)`, `Sequence > 0`. FK to attraction is `RESTRICT`. |
 | `AdminUsers` | Admin accounts with ASP.NET Core Identity password hashes; unique normalised email. |
 | `ContactSenders` | One row per contact-form email address: unique normalised (upper-case) email, latest name, first/last contact time. |
@@ -155,7 +155,7 @@ All routes are under `/api/v1`. Errors use RFC 7807 problem details with a machi
 Creation returns an `accessToken` once. Every other call must send it in the
 `X-Itinerary-Token` header (never in the URL, so it doesn't end up in logs). Missing/malformed
 token → 401; unknown plan or wrong token → 404. Each mutation returns the full updated
-`ItineraryDto`: `{ id, start: { type, presetSlug?, attractionId?, query?, label, latitude?, longitude?, coordinatesApproximate }, stops: [{ order, attraction }], maxStops, updatedAtUtc }`.
+`ItineraryDto`: `{ id, start: { type, presetSlug?, attractionId?, query?, label, latitude?, longitude?, coordinatesApproximate }, stops: [{ order, attraction }], maxStops, tripDate?, shareId?, updatedAtUtc }`.
 
 | Method & route | Body | Rules / errors |
 |---|---|---|
@@ -167,6 +167,10 @@ token → 401; unknown plan or wrong token → 404. Each mutation returns the fu
 | `PUT /itineraries/{id}/stops/order` | `{ attractionIds: [] }` | Must list every current stop exactly once, else 400 `invalid-order`. Transactional. |
 | `DELETE /itineraries/{id}/stops/{attractionId}` | – | Renumbers the remaining stops. |
 | `DELETE /itineraries/{id}/stops` | – | Clears all stops; keeps the start. |
+| `PUT /itineraries/{id}/trip-date` | `{ tripDate: "yyyy-MM-dd" \| null }` | Today (Sri Lanka time) up to a year ahead, else 400 `invalid-trip-date`. `null` clears it. |
+| `POST /itineraries/{id}/share` | – | Turns on a read-only share link; the plan's `shareId` is returned. Idempotent. |
+| `DELETE /itineraries/{id}/share` | – | Turns the share link off; the old link returns 404. |
+| `GET /shared-itineraries/{shareId}` | – | **No token.** Read-only `{ shareId, start, stops, tripDate?, updatedAtUtc }`; 404 `shared-itinerary-not-found` when sharing is off. |
 
 Road routing is not done by the API: it returns ordered coordinates and the frontend builds the
 Google Maps directions link.

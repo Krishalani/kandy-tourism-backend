@@ -46,6 +46,14 @@ public sealed class ItineraryRepository(KandyTourismDbContext db) : IItineraryRe
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.PublicId == publicId, ct);
 
+    public Task<Itinerary?> GetByShareIdAsync(Guid shareId, CancellationToken ct) =>
+        db.Itineraries.AsNoTracking()
+            .Include(i => i.Stops).ThenInclude(s => s.Attraction).ThenInclude(a => a.Category)
+            .Include(i => i.StartPreset)
+            .Include(i => i.StartAttraction)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(i => i.ShareId == shareId, ct);
+
     public async Task<(int Itineraries, int ActiveStops)> GetCountsAsync(CancellationToken ct) =>
         (await db.Itineraries.CountAsync(ct),
          await db.ItineraryStops.CountAsync(s => s.Attraction.IsActive, ct));

@@ -23,6 +23,10 @@ public sealed class ItineraryService(
     IUnitOfWork unitOfWork,
     TimeProvider clock) : IItineraryService
 {
+    /// <summary>Trip dates are Sri Lanka calendar days (UTC+05:30, no daylight saving).</summary>
+    private static readonly TimeSpan SriLankaUtcOffset = TimeSpan.FromMinutes(330);
+    private const int MaxTripDaysAhead = 365;
+
     public async Task<CreatedItineraryDto> CreateAsync(CancellationToken ct)
     {
         var preset = await presets.GetDefaultAsync(ct)
@@ -209,6 +213,67 @@ public sealed class ItineraryService(
             return await ToDtoAsync(itinerary, token);
         }, ct);
 
+    public async Task<ItineraryDto> UpdateTripDateAsync(Guid id, string? accessToken, UpdateTripDateRequest request,
+        CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        if (request.TripDate is { } tripDate)
+        {
+            var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(SriLankaUtcOffset).DateTime);
+            if (tripDate < today)
+            {
+                throw InvalidTripDate("Choose today or a later date.");
+            }
+            if (tripDate > today.AddDays(MaxTripDaysAhead))
+            {
+                throw InvalidTripDate("Choose a date within the next year.");
+            }
+        }
+
+        itinerary.TripDate = request.TripDate;
+        itinerary.UpdatedAtUtc = Now();
+        await unitOfWork.SaveChangesAsync(ct);
+        return await ToDtoAsync(itinerary, ct);
+    }
+
+    public async Task<ItineraryDto> EnableSharingAsync(Guid id, string? accessToken, CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        if (itinerary.ShareId is null)
+        {
+            itinerary.ShareId = Guid.NewGuid();
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+        return await ToDtoAsync(itinerary, ct);
+    }
+
+    public async Task<ItineraryDto> DisableSharingAsync(Guid id, string? accessToken, CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        if (itinerary.ShareId is not null)
+        {
+            itinerary.ShareId = null;
+            await unitOfWork.SaveChangesAsync(ct);
+        }
+        return await ToDtoAsync(itinerary, ct);
+    }
+
+    public async Task<SharedItineraryDto> GetSharedAsync(Guid shareId, CancellationToken ct)
+    {
+        var itinerary = await itineraries.GetByShareIdAsync(shareId, ct)
+            ?? throw new NotFoundException("shared-itinerary-not-found",
+                "This shared plan is no longer available. Its owner may have stopped sharing it.");
+        var plan = await ToDtoAsync(itinerary, ct);
+        return new SharedItineraryDto
+        {
+            ShareId = shareId,
+            Start = plan.Start,
+            Stops = plan.Stops,
+            TripDate = plan.TripDate,
+            UpdatedAtUtc = plan.UpdatedAtUtc,
+        };
+    }
+
     private async Task<Itinerary> LoadAsync(Guid id, string? accessToken, CancellationToken ct)
     {
         if (!GuestAccessToken.IsWellFormed(accessToken))
@@ -284,6 +349,8 @@ public sealed class ItineraryService(
             .Select((s, i) => new ItineraryStopDto(i + 1, s.Attraction.ToSummaryDto()))
             .ToList(),
         MaxStops = Itinerary.MaxStops,
+        TripDate = itinerary.TripDate,
+        ShareId = itinerary.ShareId,
         UpdatedAtUtc = itinerary.UpdatedAtUtc,
     };
 
@@ -331,6 +398,9 @@ public sealed class ItineraryService(
 
     private static BusinessRuleException InvalidStart(string field, string message) =>
         new("invalid-start", message, new Dictionary<string, string[]> { [field] = [message] });
+
+    private static BusinessRuleException InvalidTripDate(string message) =>
+        new("invalid-trip-date", message, new Dictionary<string, string[]> { ["tripDate"] = [message] });
 
     private DateTime Now() => clock.GetUtcNow().UtcDateTime;
 }

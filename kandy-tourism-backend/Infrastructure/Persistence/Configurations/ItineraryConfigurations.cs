@@ -20,6 +20,7 @@ public sealed class ItineraryConfiguration : IEntityTypeConfiguration<Itinerary>
         builder.Property(i => i.StartType).HasConversion<string>().HasMaxLength(20).IsRequired();
         builder.Property(i => i.StartQuery).HasMaxLength(200);
         builder.HasIndex(i => i.PublicId).IsUnique();
+        builder.HasIndex(i => i.ShareId).IsUnique().HasFilter("[ShareId] IS NOT NULL");
 
         builder.HasOne(i => i.StartPreset)
             .WithMany()

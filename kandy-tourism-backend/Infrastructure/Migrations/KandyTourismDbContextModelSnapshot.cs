@@ -368,6 +368,9 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                     b.Property<Guid>("PublicId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("ShareId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<int?>("StartAttractionId")
                         .HasColumnType("int");
 
@@ -383,6 +386,9 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<DateOnly?>("TripDate")
+                        .HasColumnType("date");
+
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -390,6 +396,10 @@ namespace KandyTourism.Api.Infrastructure.Migrations
 
                     b.HasIndex("PublicId")
                         .IsUnique();
+
+                    b.HasIndex("ShareId")
+                        .IsUnique()
+                        .HasFilter("[ShareId] IS NOT NULL");
 
                     b.HasIndex("StartAttractionId");
 
