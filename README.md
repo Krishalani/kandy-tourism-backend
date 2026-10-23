@@ -42,7 +42,9 @@ kandy-tourism-backend/              API project (namespace KandyTourism.Api)
 | `Attractions` | Catalogue. `Slug` unique among **active** rows (filtered index). Description, visitor tips and tags are JSON arrays. `SearchText` holds the normalised name/area/category/tags for keyword search. Deleting sets `IsActive = 0`. FK to category is `RESTRICT`. |
 | `AttractionImages` | Gallery photos (URL, alt text, credit, sort order); cascade with the attraction. Images are hotlinked from Wikimedia Commons. |
 | `StartPresets` | Predefined starting points (one `IsDefault`). |
-| `Itineraries` | Guest plans: public `Guid`, SHA-256 hash of the access token, start (preset / attraction / typed text), optional `TripDate` and optional `ShareId` (unique while set) for a read-only share link. |
+| `Itineraries` | Guest plans: public `Guid`, SHA-256 hash of the access token, start (preset / attraction / typed text), optional `TripDate`, optional `ShareId` (unique while set) for a read-only share link, and `Status` (`Planning` → `Confirmed` → `Completed`). |
+| `TripFeedback` | One per completed itinerary: overall `Rating` (1–5, check constraint), optional comment, submitted time. |
+| `TripStopRatings` | Optional 1–5 ratings for individual stops of a completed trip; unique per feedback and attraction. FK to attraction is `RESTRICT`. |
 | `ItineraryStops` | Ordered stops. Unique `(ItineraryId, AttractionId)` and `(ItineraryId, Sequence)`, `Sequence > 0`. FK to attraction is `RESTRICT`. |
 | `AdminUsers` | Admin accounts with ASP.NET Core Identity password hashes; unique normalised email. |
 | `ContactSenders` | One row per contact-form email address: unique normalised (upper-case) email, latest name, first/last contact time. |
@@ -155,7 +157,11 @@ All routes are under `/api/v1`. Errors use RFC 7807 problem details with a machi
 Creation returns an `accessToken` once. Every other call must send it in the
 `X-Itinerary-Token` header (never in the URL, so it doesn't end up in logs). Missing/malformed
 token → 401; unknown plan or wrong token → 404. Each mutation returns the full updated
-`ItineraryDto`: `{ id, start: { type, presetSlug?, attractionId?, query?, label, latitude?, longitude?, coordinatesApproximate }, stops: [{ order, attraction }], maxStops, tripDate?, shareId?, updatedAtUtc }`.
+`ItineraryDto`: `{ id, start: { type, presetSlug?, attractionId?, query?, label, latitude?, longitude?, coordinatesApproximate }, stops: [{ order, attraction }], maxStops, tripDate?, shareId?, status, confirmedAtUtc?, completedAtUtc?, feedback?, updatedAtUtc }`.
+
+Trip lifecycle: `planning` (editable) → `confirmed` (stops, start and date are locked; any change
+returns 409 `itinerary-confirmed` until the trip is reopened) → `completed` (final, with feedback;
+changes return 409 `itinerary-completed`). Sharing works in every state.
 
 | Method & route | Body | Rules / errors |
 |---|---|---|
@@ -170,7 +176,10 @@ token → 401; unknown plan or wrong token → 404. Each mutation returns the fu
 | `PUT /itineraries/{id}/trip-date` | `{ tripDate: "yyyy-MM-dd" \| null }` | Today (Sri Lanka time) up to a year ahead, else 400 `invalid-trip-date`. `null` clears it. |
 | `POST /itineraries/{id}/share` | – | Turns on a read-only share link; the plan's `shareId` is returned. Idempotent. |
 | `DELETE /itineraries/{id}/share` | – | Turns the share link off; the old link returns 404. |
-| `GET /shared-itineraries/{shareId}` | – | **No token.** Read-only `{ shareId, start, stops, tripDate?, updatedAtUtc }`; 404 `shared-itinerary-not-found` when sharing is off. |
+| `GET /shared-itineraries/{shareId}` | – | **No token.** Read-only `{ shareId, start, stops, tripDate?, status, updatedAtUtc }`; 404 `shared-itinerary-not-found` when sharing is off. |
+| `POST /itineraries/{id}/confirm` | – | Needs at least one stop (400 `itinerary-empty`) and a trip date from today (400 `trip-date-required` / `trip-date-passed`). Idempotent; 409 if completed. |
+| `POST /itineraries/{id}/reopen` | – | Confirmed → planning so the plan can be edited again; 409 if completed. |
+| `POST /itineraries/{id}/complete` | `{ rating: 1–5, comment?, stopRatings?: [{ attractionId, rating }] }` | Only for a confirmed trip (409 `itinerary-not-confirmed`) from its trip date (400 `trip-not-started`). Stop ratings must be for stops in the plan, once each (400 `invalid-stop-rating`). Comment ≤ 1000 chars. |
 
 Road routing is not done by the API: it returns ordered coordinates and the frontend builds the
 Google Maps directions link.
@@ -182,7 +191,7 @@ Google Maps directions link.
 | `POST /auth/login` | `{ email, password }` → `{ accessToken, tokenType, expiresAtUtc, admin }` | 200, 400, 401 (generic message), 429 (5 attempts/min/IP) |
 | `GET /auth/me` | Current admin | 200, 401 |
 | `POST /admin/users` | Create another admin: `{ email, displayName, password }` (password ≥ 12 chars) → `{ id, email, displayName, role }` | 201, 400, 401, 403, 409 `admin-email-taken` |
-| `GET /admin/dashboard` | Totals, per-category counts, guest plan counts, contact/message/unread counts and the 5 latest messages | 200, 401, 403 |
+| `GET /admin/dashboard` | Totals, per-category counts, guest plan counts, contact/message/unread counts and the 5 latest messages, confirmed/completed trips, average rating, the 5 latest feedback entries and the 5 best-rated attractions | 200, 401, 403 |
 | `GET /admin/contacts` | Contacts (one per email) with `messageCount`, `unreadCount`, `lastSubject`, newest first. Query: `q` (name or email), `status` (`all\|unread`), `page`, `pageSize` (1–100, default 20) | 200, 400 |
 | `GET /admin/contacts/{id}` | Contact with all messages, newest first | 200, 404 `contact-not-found` |
 | `PUT /admin/contacts/{id}/read` | `{ isRead }` for every message from the contact → updated contact | 200, 400, 404 |

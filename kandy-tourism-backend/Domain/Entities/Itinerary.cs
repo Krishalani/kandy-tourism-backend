@@ -33,6 +33,12 @@ public class Itinerary
     /// </summary>
     public Guid? ShareId { get; set; }
 
+    public ItineraryStatus Status { get; set; } = ItineraryStatus.Planning;
+    public DateTime? ConfirmedAtUtc { get; set; }
+    public DateTime? CompletedAtUtc { get; set; }
+    /// <summary>Set when the trip is completed.</summary>
+    public TripFeedback? Feedback { get; set; }
+
     public DateTime CreatedAtUtc { get; set; }
     public DateTime UpdatedAtUtc { get; set; }
 }

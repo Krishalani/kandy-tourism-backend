@@ -1,4 +1,5 @@
 using KandyTourism.Api.Domain.Entities;
+using KandyTourism.Api.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -21,6 +22,14 @@ public sealed class ItineraryConfiguration : IEntityTypeConfiguration<Itinerary>
         builder.Property(i => i.StartQuery).HasMaxLength(200);
         builder.HasIndex(i => i.PublicId).IsUnique();
         builder.HasIndex(i => i.ShareId).IsUnique().HasFilter("[ShareId] IS NOT NULL");
+        builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20)
+            .HasDefaultValue(ItineraryStatus.Planning).HasSentinel(ItineraryStatus.Planning).IsRequired();
+        builder.HasIndex(i => i.Status);
+
+        builder.HasOne(i => i.Feedback)
+            .WithOne(f => f.Itinerary)
+            .HasForeignKey<TripFeedback>(f => f.ItineraryId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasOne(i => i.StartPreset)
             .WithMany()
@@ -52,6 +61,40 @@ public sealed class ItineraryStopConfiguration : IEntityTypeConfiguration<Itiner
         builder.HasOne(s => s.Attraction)
             .WithMany()
             .HasForeignKey(s => s.AttractionId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public sealed class TripFeedbackConfiguration : IEntityTypeConfiguration<TripFeedback>
+{
+    public void Configure(EntityTypeBuilder<TripFeedback> builder)
+    {
+        builder.ToTable("TripFeedback", t => t.HasCheckConstraint("CK_TripFeedback_Rating",
+            $"[Rating] BETWEEN {TripFeedback.MinRating} AND {TripFeedback.MaxRating}"));
+        builder.Property(f => f.Comment).HasMaxLength(TripFeedback.CommentMaxLength);
+        builder.HasIndex(f => f.ItineraryId).IsUnique();
+        builder.HasIndex(f => f.SubmittedAtUtc);
+
+        builder.HasMany(f => f.StopRatings)
+            .WithOne(r => r.Feedback)
+            .HasForeignKey(r => r.TripFeedbackId)
+            .OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public sealed class TripStopRatingConfiguration : IEntityTypeConfiguration<TripStopRating>
+{
+    public void Configure(EntityTypeBuilder<TripStopRating> builder)
+    {
+        builder.ToTable("TripStopRatings", t => t.HasCheckConstraint("CK_TripStopRatings_Rating",
+            $"[Rating] BETWEEN {TripFeedback.MinRating} AND {TripFeedback.MaxRating}"));
+        builder.HasIndex(r => new { r.TripFeedbackId, r.AttractionId }).IsUnique();
+        builder.HasIndex(r => r.AttractionId);
+
+        // Attractions are deactivated rather than deleted, so ratings keep their attraction.
+        builder.HasOne(r => r.Attraction)
+            .WithMany()
+            .HasForeignKey(r => r.AttractionId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

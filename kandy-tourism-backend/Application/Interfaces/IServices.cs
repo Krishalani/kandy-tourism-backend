@@ -39,6 +39,12 @@ public interface IItineraryService
     /// <summary>Removes the share link; anyone who has it can no longer open the plan.</summary>
     Task<ItineraryDto> DisableSharingAsync(Guid id, string? accessToken, CancellationToken ct);
     Task<SharedItineraryDto> GetSharedAsync(Guid shareId, CancellationToken ct);
+    /// <summary>Locks a finished plan for the trip day; needs at least one stop and an upcoming trip date.</summary>
+    Task<ItineraryDto> ConfirmAsync(Guid id, string? accessToken, CancellationToken ct);
+    /// <summary>Unlocks a confirmed plan so it can be edited again.</summary>
+    Task<ItineraryDto> ReopenAsync(Guid id, string? accessToken, CancellationToken ct);
+    /// <summary>Saves the guest's feedback and completes a confirmed trip, from the trip day onwards.</summary>
+    Task<ItineraryDto> CompleteAsync(Guid id, string? accessToken, CompleteTripRequest request, CancellationToken ct);
 }
 
 public interface IAdminAuthService

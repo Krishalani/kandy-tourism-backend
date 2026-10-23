@@ -11,6 +11,8 @@ public class KandyTourismDbContext(DbContextOptions<KandyTourismDbContext> optio
     public DbSet<StartPreset> StartPresets => Set<StartPreset>();
     public DbSet<Itinerary> Itineraries => Set<Itinerary>();
     public DbSet<ItineraryStop> ItineraryStops => Set<ItineraryStop>();
+    public DbSet<TripFeedback> TripFeedback => Set<TripFeedback>();
+    public DbSet<TripStopRating> TripStopRatings => Set<TripStopRating>();
     public DbSet<AdminUser> AdminUsers => Set<AdminUser>();
     public DbSet<ContactSender> ContactSenders => Set<ContactSender>();
     public DbSet<ContactMessage> ContactMessages => Set<ContactMessage>();

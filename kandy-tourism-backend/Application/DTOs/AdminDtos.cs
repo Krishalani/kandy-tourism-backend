@@ -43,4 +43,18 @@ public sealed record AdminDashboardDto(
     int Contacts,
     int ContactMessages,
     int UnreadMessages,
-    IReadOnlyList<RecentContactMessageDto> RecentMessages);
+    IReadOnlyList<RecentContactMessageDto> RecentMessages,
+    int ConfirmedTrips,
+    int CompletedTrips,
+    double? AverageRating,
+    IReadOnlyList<RecentFeedbackDto> RecentFeedback,
+    IReadOnlyList<RatedAttractionDto> TopRatedAttractions);
+
+public sealed record RecentFeedbackDto(
+    int Rating,
+    string? Comment,
+    DateOnly? TripDate,
+    int StopCount,
+    DateTime SubmittedAtUtc);
+
+public sealed record RatedAttractionDto(string Slug, string Name, double AverageRating, int RatingCount);

@@ -1,5 +1,6 @@
 using KandyTourism.Api.Application.Interfaces;
 using KandyTourism.Api.Domain.Entities;
+using KandyTourism.Api.Domain.Enums;
 using KandyTourism.Api.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -43,6 +44,7 @@ public sealed class ItineraryRepository(KandyTourismDbContext db) : IItineraryRe
             .Include(i => i.Stops).ThenInclude(s => s.Attraction).ThenInclude(a => a.Category)
             .Include(i => i.StartPreset)
             .Include(i => i.StartAttraction)
+            .Include(i => i.Feedback).ThenInclude(f => f!.StopRatings)
             .AsSplitQuery()
             .FirstOrDefaultAsync(i => i.PublicId == publicId, ct);
 
@@ -57,6 +59,41 @@ public sealed class ItineraryRepository(KandyTourismDbContext db) : IItineraryRe
     public async Task<(int Itineraries, int ActiveStops)> GetCountsAsync(CancellationToken ct) =>
         (await db.Itineraries.CountAsync(ct),
          await db.ItineraryStops.CountAsync(s => s.Attraction.IsActive, ct));
+
+    public async Task<TripFeedbackStatistics> GetFeedbackStatisticsAsync(int recentCount, int topCount, CancellationToken ct)
+    {
+        var confirmed = await db.Itineraries.CountAsync(i => i.Status == ItineraryStatus.Confirmed, ct);
+        var completed = await db.Itineraries.CountAsync(i => i.Status == ItineraryStatus.Completed, ct);
+        var average = await db.TripFeedback.Select(f => (double?)f.Rating).AverageAsync(ct);
+
+        var recent = await db.TripFeedback.AsNoTracking()
+            .OrderByDescending(f => f.SubmittedAtUtc).ThenByDescending(f => f.Id)
+            .Take(recentCount)
+            .Select(f => new
+            {
+                f.Rating,
+                f.Comment,
+                f.Itinerary.TripDate,
+                StopCount = f.Itinerary.Stops.Count(s => s.Attraction.IsActive),
+                f.SubmittedAtUtc,
+            })
+            .ToListAsync(ct);
+
+        var topRated = await db.TripStopRatings.AsNoTracking()
+            .Where(r => r.Attraction.IsActive)
+            .GroupBy(r => new { r.Attraction.Slug, r.Attraction.Name })
+            .Select(g => new { g.Key.Slug, g.Key.Name, Average = g.Average(r => (double)r.Rating), Count = g.Count() })
+            .OrderByDescending(a => a.Average).ThenByDescending(a => a.Count).ThenBy(a => a.Name)
+            .Take(topCount)
+            .ToListAsync(ct);
+
+        return new TripFeedbackStatistics(
+            confirmed,
+            completed,
+            average,
+            recent.Select(f => new RecentTripFeedback(f.Rating, f.Comment, f.TripDate, f.StopCount, f.SubmittedAtUtc)).ToList(),
+            topRated.Select(a => new AttractionRating(a.Slug, a.Name, a.Average, a.Count)).ToList());
+    }
 
     public void Add(Itinerary itinerary) => db.Itineraries.Add(itinerary);
 

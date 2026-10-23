@@ -10,6 +10,8 @@ public sealed class AdminDashboardService(
     IContactRepository contacts) : IAdminDashboardService
 {
     private const int RecentMessageCount = 5;
+    private const int RecentFeedbackCount = 5;
+    private const int TopRatedCount = 5;
 
     public async Task<AdminDashboardDto> GetAsync(CancellationToken ct)
     {
@@ -19,6 +21,7 @@ public sealed class AdminDashboardService(
             .ToList();
         var (guestItineraries, plannedStops) = await itineraries.GetCountsAsync(ct);
         var messages = await contacts.GetStatisticsAsync(RecentMessageCount, ct);
+        var feedback = await itineraries.GetFeedbackStatisticsAsync(RecentFeedbackCount, TopRatedCount, ct);
 
         return new AdminDashboardDto(
             stats.Total,
@@ -40,6 +43,20 @@ public sealed class AdminDashboardService(
                     m.Subject,
                     DateTime.SpecifyKind(m.ReceivedAtUtc, DateTimeKind.Utc),
                     m.IsRead))
+                .ToList(),
+            feedback.ConfirmedTrips,
+            feedback.CompletedTrips,
+            feedback.AverageRating is { } average ? Math.Round(average, 1) : null,
+            feedback.Recent
+                .Select(f => new RecentFeedbackDto(
+                    f.Rating,
+                    f.Comment,
+                    f.TripDate,
+                    f.StopCount,
+                    DateTime.SpecifyKind(f.SubmittedAtUtc, DateTimeKind.Utc)))
+                .ToList(),
+            feedback.TopRated
+                .Select(a => new RatedAttractionDto(a.Slug, a.Name, Math.Round(a.AverageRating, 1), a.RatingCount))
                 .ToList());
     }
 }

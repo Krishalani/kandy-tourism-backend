@@ -362,6 +362,12 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                         .HasColumnType("binary(32)")
                         .IsFixedLength();
 
+                    b.Property<DateTime?>("CompletedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("ConfirmedAtUtc")
+                        .HasColumnType("datetime2");
+
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
@@ -386,6 +392,13 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)")
+                        .HasDefaultValue("Planning");
+
                     b.Property<DateOnly?>("TripDate")
                         .HasColumnType("date");
 
@@ -404,6 +417,8 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                     b.HasIndex("StartAttractionId");
 
                     b.HasIndex("StartPresetId");
+
+                    b.HasIndex("Status");
 
                     b.ToTable("Itineraries", null, t =>
                         {
@@ -501,6 +516,70 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.TripFeedback", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Comment")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ItineraryId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SubmittedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ItineraryId")
+                        .IsUnique();
+
+                    b.HasIndex("SubmittedAtUtc");
+
+                    b.ToTable("TripFeedback", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TripFeedback_Rating", "[Rating] BETWEEN 1 AND 5");
+                        });
+                });
+
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.TripStopRating", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AttractionId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("int");
+
+                    b.Property<int>("TripFeedbackId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AttractionId");
+
+                    b.HasIndex("TripFeedbackId", "AttractionId")
+                        .IsUnique();
+
+                    b.ToTable("TripStopRatings", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_TripStopRatings_Rating", "[Rating] BETWEEN 1 AND 5");
+                        });
+                });
+
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Attraction", b =>
                 {
                     b.HasOne("KandyTourism.Api.Domain.Entities.AttractionCategory", "Category")
@@ -570,6 +649,36 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                     b.Navigation("Itinerary");
                 });
 
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.TripFeedback", b =>
+                {
+                    b.HasOne("KandyTourism.Api.Domain.Entities.Itinerary", "Itinerary")
+                        .WithOne("Feedback")
+                        .HasForeignKey("KandyTourism.Api.Domain.Entities.TripFeedback", "ItineraryId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Itinerary");
+                });
+
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.TripStopRating", b =>
+                {
+                    b.HasOne("KandyTourism.Api.Domain.Entities.Attraction", "Attraction")
+                        .WithMany()
+                        .HasForeignKey("AttractionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KandyTourism.Api.Domain.Entities.TripFeedback", "Feedback")
+                        .WithMany("StopRatings")
+                        .HasForeignKey("TripFeedbackId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Attraction");
+
+                    b.Navigation("Feedback");
+                });
+
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Attraction", b =>
                 {
                     b.Navigation("Gallery");
@@ -587,7 +696,14 @@ namespace KandyTourism.Api.Infrastructure.Migrations
 
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Itinerary", b =>
                 {
+                    b.Navigation("Feedback");
+
                     b.Navigation("Stops");
+                });
+
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.TripFeedback", b =>
+                {
+                    b.Navigation("StopRatings");
                 });
 #pragma warning restore 612, 618
         }

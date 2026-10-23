@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using KandyTourism.Api.Domain.Entities;
 using KandyTourism.Api.Domain.Enums;
 using ItineraryEntity = KandyTourism.Api.Domain.Entities.Itinerary;
 
@@ -33,7 +34,43 @@ public sealed record ItineraryDto
     public DateOnly? TripDate { get; init; }
     /// <summary>Set while a read-only share link is active (<c>GET /api/v1/shared-itineraries/{shareId}</c>).</summary>
     public Guid? ShareId { get; init; }
+    /// <summary>planning (editable) → confirmed (locked for the trip) → completed (with feedback).</summary>
+    public ItineraryStatus Status { get; init; }
+    public DateTime? ConfirmedAtUtc { get; init; }
+    public DateTime? CompletedAtUtc { get; init; }
+    public TripFeedbackDto? Feedback { get; init; }
     public DateTime UpdatedAtUtc { get; init; }
+}
+
+public sealed record TripFeedbackDto(
+    int Rating,
+    string? Comment,
+    IReadOnlyList<StopRatingDto> StopRatings,
+    DateTime SubmittedAtUtc);
+
+public sealed record StopRatingDto(int AttractionId, int Rating);
+
+/// <summary>Body of <c>POST /itineraries/{id}/complete</c>: the guest's feedback on the day.</summary>
+public sealed record CompleteTripRequest
+{
+    [Required, Range(TripFeedback.MinRating, TripFeedback.MaxRating, ErrorMessage = "Choose a rating from 1 to 5 stars.")]
+    public int? Rating { get; init; }
+
+    [StringLength(TripFeedback.CommentMaxLength)]
+    public string? Comment { get; init; }
+
+    /// <summary>Optional ratings for individual stops in the plan.</summary>
+    [MaxLength(ItineraryEntity.MaxStops)]
+    public List<StopRatingRequest> StopRatings { get; init; } = [];
+}
+
+public sealed record StopRatingRequest
+{
+    [Range(1, int.MaxValue)]
+    public int AttractionId { get; init; }
+
+    [Range(TripFeedback.MinRating, TripFeedback.MaxRating, ErrorMessage = "Choose a rating from 1 to 5 stars.")]
+    public int Rating { get; init; }
 }
 
 /// <summary>A read-only view of a shared plan. It carries no ID or token that could change the plan.</summary>
@@ -43,6 +80,7 @@ public sealed record SharedItineraryDto
     public ItineraryStartDto Start { get; init; } = new();
     public IReadOnlyList<ItineraryStopDto> Stops { get; init; } = [];
     public DateOnly? TripDate { get; init; }
+    public ItineraryStatus Status { get; init; }
     public DateTime UpdatedAtUtc { get; init; }
 }
 

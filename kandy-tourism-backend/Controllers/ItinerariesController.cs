@@ -89,6 +89,32 @@ public sealed class ItinerariesController(IItineraryService itineraries) : Contr
     [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
     public Task<ItineraryDto> DisableSharing(Guid id, [FromHeader(Name = TokenHeader)] string? token,
         CancellationToken ct) => itineraries.DisableSharingAsync(id, token, ct);
+
+    /// <summary>
+    /// Confirms the trip (idempotent). Needs at least one stop and a trip date from today onwards; the
+    /// stops, start and date are then locked until the trip is reopened.
+    /// </summary>
+    [HttpPost("{id:guid}/confirm")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<ItineraryDto> Confirm(Guid id, [FromHeader(Name = TokenHeader)] string? token, CancellationToken ct) =>
+        itineraries.ConfirmAsync(id, token, ct);
+
+    /// <summary>Moves a confirmed trip back to planning so it can be changed.</summary>
+    [HttpPost("{id:guid}/reopen")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<ItineraryDto> Reopen(Guid id, [FromHeader(Name = TokenHeader)] string? token, CancellationToken ct) =>
+        itineraries.ReopenAsync(id, token, ct);
+
+    /// <summary>Completes a confirmed trip with the guest's rating, optional stop ratings and comment.</summary>
+    [HttpPost("{id:guid}/complete")]
+    [ProducesResponseType<ItineraryDto>(StatusCodes.Status200OK)]
+    [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType<ProblemDetails>(StatusCodes.Status409Conflict)]
+    public Task<ItineraryDto> Complete(Guid id, [FromHeader(Name = TokenHeader)] string? token,
+        CompleteTripRequest request, CancellationToken ct) => itineraries.CompleteAsync(id, token, request, ct);
 }
 
 /// <summary>Read-only access to plans their owners have chosen to share. No token is needed.</summary>

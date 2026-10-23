@@ -59,9 +59,27 @@ public interface IItineraryRepository
     /// <summary>Read-only itinerary (same graph as <see cref="GetByPublicIdAsync"/>) for an active share link.</summary>
     Task<Itinerary?> GetByShareIdAsync(Guid shareId, CancellationToken ct);
     Task<(int Itineraries, int ActiveStops)> GetCountsAsync(CancellationToken ct);
+    /// <summary>Trip lifecycle counts, the overall average rating, latest feedback and best-rated attractions.</summary>
+    Task<TripFeedbackStatistics> GetFeedbackStatisticsAsync(int recentCount, int topCount, CancellationToken ct);
     void Add(Itinerary itinerary);
     void RemoveStop(ItineraryStop stop);
 }
+
+public sealed record TripFeedbackStatistics(
+    int ConfirmedTrips,
+    int CompletedTrips,
+    double? AverageRating,
+    IReadOnlyList<RecentTripFeedback> Recent,
+    IReadOnlyList<AttractionRating> TopRated);
+
+public sealed record RecentTripFeedback(
+    int Rating,
+    string? Comment,
+    DateOnly? TripDate,
+    int StopCount,
+    DateTime SubmittedAtUtc);
+
+public sealed record AttractionRating(string Slug, string Name, double AverageRating, int RatingCount);
 
 public interface IAdminUserRepository
 {

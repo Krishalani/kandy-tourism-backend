@@ -1,3 +1,4 @@
+using System.Globalization;
 using KandyTourism.Api.Application.Common;
 using KandyTourism.Api.Application.DTOs;
 using KandyTourism.Api.Application.Interfaces;
@@ -54,7 +55,7 @@ public sealed class ItineraryService(
 
     public async Task<ItineraryDto> UpdateStartAsync(Guid id, string? accessToken, UpdateStartRequest request, CancellationToken ct)
     {
-        var itinerary = await LoadAsync(id, accessToken, ct);
+        var itinerary = await LoadEditableAsync(id, accessToken, ct);
 
         switch (request.Type)
         {
@@ -101,7 +102,7 @@ public sealed class ItineraryService(
     public Task<ItineraryDto> AddStopAsync(Guid id, string? accessToken, AddStopRequest request, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var itinerary = await LoadAsync(id, accessToken, token);
+            var itinerary = await LoadEditableAsync(id, accessToken, token);
             var visible = VisibleStops(itinerary);
 
             if (visible.Any(s => s.AttractionId == request.AttractionId))
@@ -131,7 +132,7 @@ public sealed class ItineraryService(
     public Task<ItineraryDto> AddStopsBySlugAsync(Guid id, string? accessToken, AddStopsBySlugRequest request, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var itinerary = await LoadAsync(id, accessToken, token);
+            var itinerary = await LoadEditableAsync(id, accessToken, token);
             var visible = VisibleStops(itinerary);
 
             var slugs = request.AttractionSlugs
@@ -165,7 +166,7 @@ public sealed class ItineraryService(
     public Task<ItineraryDto> RemoveStopAsync(Guid id, string? accessToken, int attractionId, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var itinerary = await LoadAsync(id, accessToken, token);
+            var itinerary = await LoadEditableAsync(id, accessToken, token);
             var stop = itinerary.Stops.FirstOrDefault(s => s.AttractionId == attractionId)
                 ?? throw new NotFoundException("stop-not-found", "That attraction isn't in your plan.");
 
@@ -180,7 +181,7 @@ public sealed class ItineraryService(
     public Task<ItineraryDto> ReorderStopsAsync(Guid id, string? accessToken, ReorderStopsRequest request, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var itinerary = await LoadAsync(id, accessToken, token);
+            var itinerary = await LoadEditableAsync(id, accessToken, token);
             var visible = VisibleStops(itinerary);
             var requested = request.AttractionIds;
 
@@ -202,7 +203,7 @@ public sealed class ItineraryService(
     public Task<ItineraryDto> ClearStopsAsync(Guid id, string? accessToken, CancellationToken ct) =>
         unitOfWork.ExecuteInTransactionAsync(async token =>
         {
-            var itinerary = await LoadAsync(id, accessToken, token);
+            var itinerary = await LoadEditableAsync(id, accessToken, token);
             foreach (var stop in itinerary.Stops.ToList())
             {
                 itinerary.Stops.Remove(stop);
@@ -216,10 +217,10 @@ public sealed class ItineraryService(
     public async Task<ItineraryDto> UpdateTripDateAsync(Guid id, string? accessToken, UpdateTripDateRequest request,
         CancellationToken ct)
     {
-        var itinerary = await LoadAsync(id, accessToken, ct);
+        var itinerary = await LoadEditableAsync(id, accessToken, ct);
         if (request.TripDate is { } tripDate)
         {
-            var today = DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(SriLankaUtcOffset).DateTime);
+            var today = SriLankaToday();
             if (tripDate < today)
             {
                 throw InvalidTripDate("Choose today or a later date.");
@@ -258,6 +259,101 @@ public sealed class ItineraryService(
         return await ToDtoAsync(itinerary, ct);
     }
 
+    public async Task<ItineraryDto> ConfirmAsync(Guid id, string? accessToken, CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        switch (itinerary.Status)
+        {
+            case ItineraryStatus.Confirmed:
+                return await ToDtoAsync(itinerary, ct);
+            case ItineraryStatus.Completed:
+                throw TripCompleted();
+        }
+
+        if (VisibleStops(itinerary).Count == 0)
+        {
+            throw new BusinessRuleException("itinerary-empty", "Add at least one stop before confirming your trip.");
+        }
+        if (itinerary.TripDate is not { } tripDate)
+        {
+            throw TripDateProblem("trip-date-required", "Choose your trip date before confirming.");
+        }
+        if (tripDate < SriLankaToday())
+        {
+            throw TripDateProblem("trip-date-passed", "Your trip date has passed. Choose a new date before confirming.");
+        }
+
+        var now = Now();
+        itinerary.Status = ItineraryStatus.Confirmed;
+        itinerary.ConfirmedAtUtc = now;
+        itinerary.UpdatedAtUtc = now;
+        await unitOfWork.SaveChangesAsync(ct);
+        return await ToDtoAsync(itinerary, ct);
+    }
+
+    public async Task<ItineraryDto> ReopenAsync(Guid id, string? accessToken, CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        switch (itinerary.Status)
+        {
+            case ItineraryStatus.Completed:
+                throw TripCompleted();
+            case ItineraryStatus.Confirmed:
+                itinerary.Status = ItineraryStatus.Planning;
+                itinerary.ConfirmedAtUtc = null;
+                itinerary.UpdatedAtUtc = Now();
+                await unitOfWork.SaveChangesAsync(ct);
+                break;
+        }
+        return await ToDtoAsync(itinerary, ct);
+    }
+
+    public async Task<ItineraryDto> CompleteAsync(Guid id, string? accessToken, CompleteTripRequest request,
+        CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        if (itinerary.Status == ItineraryStatus.Completed)
+        {
+            throw TripCompleted();
+        }
+        if (itinerary.Status != ItineraryStatus.Confirmed)
+        {
+            throw new ConflictException("itinerary-not-confirmed", "Confirm your trip before completing it.");
+        }
+        if (itinerary.TripDate is { } tripDate && tripDate > SriLankaToday())
+        {
+            throw new BusinessRuleException("trip-not-started",
+                $"You can complete this trip from {tripDate.ToString("dddd d MMMM", CultureInfo.InvariantCulture)} onwards.");
+        }
+
+        var stopIds = VisibleStops(itinerary).Select(s => s.AttractionId).ToHashSet();
+        var stopRatings = request.StopRatings;
+        if (stopRatings.Any(r => !stopIds.Contains(r.AttractionId)) ||
+            stopRatings.Select(r => r.AttractionId).Distinct().Count() != stopRatings.Count)
+        {
+            const string message = "Rate each stop of this trip at most once.";
+            throw new BusinessRuleException("invalid-stop-rating", message,
+                new Dictionary<string, string[]> { ["stopRatings"] = [message] });
+        }
+
+        var now = Now();
+        var comment = request.Comment?.Trim();
+        itinerary.Feedback = new TripFeedback
+        {
+            Rating = request.Rating!.Value,
+            Comment = string.IsNullOrEmpty(comment) ? null : comment,
+            SubmittedAtUtc = now,
+            StopRatings = stopRatings
+                .Select(r => new TripStopRating { AttractionId = r.AttractionId, Rating = r.Rating })
+                .ToList(),
+        };
+        itinerary.Status = ItineraryStatus.Completed;
+        itinerary.CompletedAtUtc = now;
+        itinerary.UpdatedAtUtc = now;
+        await unitOfWork.SaveChangesAsync(ct);
+        return await ToDtoAsync(itinerary, ct);
+    }
+
     public async Task<SharedItineraryDto> GetSharedAsync(Guid shareId, CancellationToken ct)
     {
         var itinerary = await itineraries.GetByShareIdAsync(shareId, ct)
@@ -270,7 +366,21 @@ public sealed class ItineraryService(
             Start = plan.Start,
             Stops = plan.Stops,
             TripDate = plan.TripDate,
+            Status = plan.Status,
             UpdatedAtUtc = plan.UpdatedAtUtc,
+        };
+    }
+
+    /// <summary>Loads the plan for a change to its stops, start or date, which only a planning trip allows.</summary>
+    private async Task<Itinerary> LoadEditableAsync(Guid id, string? accessToken, CancellationToken ct)
+    {
+        var itinerary = await LoadAsync(id, accessToken, ct);
+        return itinerary.Status switch
+        {
+            ItineraryStatus.Confirmed => throw new ConflictException("itinerary-confirmed",
+                "Your trip is confirmed, so it can’t be changed. Choose “Change plan” to edit it again."),
+            ItineraryStatus.Completed => throw TripCompleted(),
+            _ => itinerary,
         };
     }
 
@@ -351,6 +461,16 @@ public sealed class ItineraryService(
         MaxStops = Itinerary.MaxStops,
         TripDate = itinerary.TripDate,
         ShareId = itinerary.ShareId,
+        Status = itinerary.Status,
+        ConfirmedAtUtc = AsUtc(itinerary.ConfirmedAtUtc),
+        CompletedAtUtc = AsUtc(itinerary.CompletedAtUtc),
+        Feedback = itinerary.Feedback is { } feedback
+            ? new TripFeedbackDto(
+                feedback.Rating,
+                feedback.Comment,
+                feedback.StopRatings.Select(r => new StopRatingDto(r.AttractionId, r.Rating)).ToList(),
+                DateTime.SpecifyKind(feedback.SubmittedAtUtc, DateTimeKind.Utc))
+            : null,
         UpdatedAtUtc = itinerary.UpdatedAtUtc,
     };
 
@@ -399,8 +519,19 @@ public sealed class ItineraryService(
     private static BusinessRuleException InvalidStart(string field, string message) =>
         new("invalid-start", message, new Dictionary<string, string[]> { [field] = [message] });
 
-    private static BusinessRuleException InvalidTripDate(string message) =>
-        new("invalid-trip-date", message, new Dictionary<string, string[]> { ["tripDate"] = [message] });
+    private static BusinessRuleException InvalidTripDate(string message) => TripDateProblem("invalid-trip-date", message);
+
+    private static BusinessRuleException TripDateProblem(string code, string message) =>
+        new(code, message, new Dictionary<string, string[]> { ["tripDate"] = [message] });
+
+    private static ConflictException TripCompleted() =>
+        new("itinerary-completed", "This trip is completed and can’t be changed. Start a new plan for another day.");
+
+    private DateOnly SriLankaToday() => DateOnly.FromDateTime(clock.GetUtcNow().ToOffset(SriLankaUtcOffset).DateTime);
+
+    /// <summary>SQL Server returns stored UTC values without a kind; mark them so JSON carries the "Z".</summary>
+    private static DateTime? AsUtc(DateTime? value) =>
+        value is { } v ? DateTime.SpecifyKind(v, DateTimeKind.Utc) : null;
 
     private DateTime Now() => clock.GetUtcNow().UtcDateTime;
 }
