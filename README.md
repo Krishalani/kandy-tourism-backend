@@ -66,21 +66,21 @@ To use another SQL Server, override `ConnectionStrings:KandyTourism` with user-s
 `ConnectionStrings__KandyTourism` environment variable. Don't commit connection strings that
 contain passwords.
 
-### 2. Secrets (required)
+### 2. Secrets
 
+The JWT signing key (`Jwt:SigningKey`) is set in `appsettings.json`, so no setup is needed for it
+locally. The API refuses to start if it is missing or shorter than 32 characters.
+
+Optional: create the first admin on the next start (only if no admin with that email exists).
 Run these in `kandy-tourism-backend/` (values are stored outside the repository):
 
 ```powershell
-# JWT signing key: at least 32 random characters
-dotnet user-secrets set "Jwt:SigningKey" "<a long random string>"
-
-# Optional: create the first admin on the next start (only if no admin with that email exists)
 dotnet user-secrets set "BootstrapAdmin:Email" "you@example.org"
 dotnet user-secrets set "BootstrapAdmin:DisplayName" "Your Name"
 dotnet user-secrets set "BootstrapAdmin:Password" "<at least 12 characters>"
 ```
 
-The API refuses to start without `Jwt:SigningKey`. The bootstrap admin is created once; the
+The bootstrap admin is created once; the
 password is hashed and never logged. After the first start you can remove the
 `BootstrapAdmin:Password` secret (`dotnet user-secrets remove "BootstrapAdmin:Password"`). No admin
 credentials exist in source code or seed data. Once signed in, an admin can add further admins
@@ -190,14 +190,15 @@ admin account is still active.
   and apply it before deploying; keep `Database:ApplyMigrationsOnStartup` false in production.
   Then run the SQL seed script once (or enable `Database:SeedOnStartup`).
 - Provide `ConnectionStrings__KandyTourism`, `Jwt__SigningKey` and `Cors__AllowedOrigins__0`
-  (the site's origin) as environment variables or a secret store.
+  (the site's origin) as environment variables or a secret store. Replace the committed
+  `Jwt:SigningKey` with a new random value, since anyone with the repository can read it.
 - Outside Development the API uses HTTPS redirection and HSTS, and Swagger is disabled.
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
-| Startup error about `Jwt:SigningKey` | Set the user-secret (step 2). |
+| Startup error about `Jwt:SigningKey` | Check `Jwt:SigningKey` in `appsettings.json` is present and at least 32 characters. |
 | `Cannot open database` / LocalDB errors | `sqllocaldb start MSSQLLocalDB`; check the connection string. |
 | Browser shows "couldn’t reach the server" | Is the API running on port 5201? Is the site's origin in `Cors:AllowedOrigins`? |
 | `Msg 1934 … QUOTED_IDENTIFIER` when running SQL by hand | Use the provided script (it sets the option) or `SET QUOTED_IDENTIFIER ON` first. |

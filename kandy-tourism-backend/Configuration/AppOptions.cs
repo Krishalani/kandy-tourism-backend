@@ -23,7 +23,7 @@ public sealed class JwtOptions
     [Required]
     public string Audience { get; init; } = string.Empty;
 
-    /// <summary>HMAC-SHA256 key, at least 32 bytes. Supply via user-secrets or an environment variable, never source control.</summary>
+    /// <summary>HMAC-SHA256 key, at least 32 bytes. Set in appsettings.json; override with the Jwt__SigningKey environment variable in production.</summary>
     [Required, MinLength(32, ErrorMessage = "Jwt:SigningKey must be at least 32 characters.")]
     public string SigningKey { get; init; } = string.Empty;
 
