@@ -47,4 +47,9 @@ public sealed class RateLimitOptions
 
     /// <summary>Sign-in attempts allowed per client IP per minute.</summary>
     public int LoginPermitLimit { get; init; } = 5;
+
+    /// <summary>Contact-form messages allowed per client IP per <see cref="ContactWindowMinutes"/>.</summary>
+    public int ContactPermitLimit { get; init; } = 5;
+
+    public int ContactWindowMinutes { get; init; } = 10;
 }

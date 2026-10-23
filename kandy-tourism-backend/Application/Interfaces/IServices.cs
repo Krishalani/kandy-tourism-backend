@@ -52,6 +52,19 @@ public interface IAdminDashboardService
     Task<AdminDashboardDto> GetAsync(CancellationToken ct);
 }
 
+public interface IContactService
+{
+    /// <summary>Stores a contact-form message under the sender's email address (created on first contact).</summary>
+    Task<ContactMessageReceiptDto> SendAsync(SendContactMessageRequest request, CancellationToken ct);
+
+    Task<PagedResult<ContactSummaryDto>> SearchAsync(ContactListQuery query, CancellationToken ct);
+    Task<ContactDetailsDto> GetAsync(int contactId, CancellationToken ct);
+    Task<ContactDetailsDto> SetMessageReadAsync(int contactId, int messageId, bool isRead, CancellationToken ct);
+    Task<ContactDetailsDto> SetAllReadAsync(int contactId, bool isRead, CancellationToken ct);
+    /// <summary>Permanently deletes the contact and all of their messages.</summary>
+    Task DeleteAsync(int contactId, CancellationToken ct);
+}
+
 public interface IAccessTokenService
 {
     (string Token, DateTime ExpiresAtUtc) CreateToken(AdminUser user);

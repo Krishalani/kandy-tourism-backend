@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Metadata;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -26,6 +27,7 @@ public static class ServiceCollectionExtensions
     public const string FrontendCorsPolicy = "Frontend";
     public const string AdminPolicy = "AdminOnly";
     public const string LoginRateLimitPolicy = "login";
+    public const string ContactRateLimitPolicy = "contact";
     public const string ConnectionStringName = "KandyTourism";
 
     public static IServiceCollection AddApplicationServices(this IServiceCollection services)
@@ -37,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAdminAuthService, AdminAuthService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+        services.AddScoped<IContactService, ContactService>();
         return services;
     }
 
@@ -54,6 +57,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStartPresetRepository, StartPresetRepository>();
         services.AddScoped<IItineraryRepository, ItineraryRepository>();
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
+        services.AddScoped<IContactRepository, ContactRepository>();
 
         services.AddScoped<DatabaseSeeder>();
         services.AddScoped<AdminBootstrapper>();
@@ -114,20 +118,31 @@ public static class ServiceCollectionExtensions
         services.AddAuthorizationBuilder()
             .AddPolicy(AdminPolicy, policy => policy.RequireAuthenticatedUser().RequireRole(AdminUser.AdminRole));
 
-        var loginLimit = configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>()?.LoginPermitLimit ?? 5;
+        var limits = configuration.GetSection(RateLimitOptions.Section).Get<RateLimitOptions>() ?? new RateLimitOptions();
         services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
             options.AddPolicy(LoginRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
                 http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-                _ => new FixedWindowRateLimiterOptions { PermitLimit = loginLimit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+                _ => new FixedWindowRateLimiterOptions { PermitLimit = limits.LoginPermitLimit, Window = TimeSpan.FromMinutes(1), QueueLimit = 0 }));
+            options.AddPolicy(ContactRateLimitPolicy, http => RateLimitPartition.GetFixedWindowLimiter(
+                http.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = limits.ContactPermitLimit,
+                    Window = TimeSpan.FromMinutes(limits.ContactWindowMinutes),
+                    QueueLimit = 0,
+                }));
             options.OnRejected = async (context, ct) =>
             {
+                var policy = context.HttpContext.GetEndpoint()?.Metadata.GetMetadata<EnableRateLimitingAttribute>()?.PolicyName;
                 var problem = new ProblemDetails
                 {
                     Status = StatusCodes.Status429TooManyRequests,
                     Title = "Too many requests",
-                    Detail = "Too many sign-in attempts. Please wait a minute and try again.",
+                    Detail = policy == ContactRateLimitPolicy
+                        ? "You've sent several messages in a short time. Please wait a few minutes and try again."
+                        : "Too many sign-in attempts. Please wait a minute and try again.",
                 };
                 problem.Extensions["code"] = "rate-limited";
                 await context.HttpContext.RequestServices.GetRequiredService<IProblemDetailsService>()

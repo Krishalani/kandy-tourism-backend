@@ -18,7 +18,7 @@ kandy-tourism-backend/              API project (namespace KandyTourism.Api)
 ├── Application/
 │   ├── DTOs/                       Request/response contracts (+ validation attributes)
 │   ├── Interfaces/                 Service and repository abstractions, IUnitOfWork
-│   ├── Services/                   Business rules (attractions, itineraries, auth, dashboard)
+│   ├── Services/                   Business rules (attractions, itineraries, contact messages, auth, dashboard)
 │   ├── Mapping/                    Entity → DTO mapping
 │   └── Common/                     Search normalisation, guest tokens, geo distance
 ├── Domain/                         Entities, enums, application exceptions
@@ -45,6 +45,8 @@ kandy-tourism-backend/              API project (namespace KandyTourism.Api)
 | `Itineraries` | Guest plans: public `Guid`, SHA-256 hash of the access token, start (preset / attraction / typed text). |
 | `ItineraryStops` | Ordered stops. Unique `(ItineraryId, AttractionId)` and `(ItineraryId, Sequence)`, `Sequence > 0`. FK to attraction is `RESTRICT`. |
 | `AdminUsers` | Admin accounts with ASP.NET Core Identity password hashes; unique normalised email. |
+| `ContactSenders` | One row per contact-form email address: unique normalised (upper-case) email, latest name, first/last contact time. |
+| `ContactMessages` | Contact-form messages (subject, body, received time, `ReadAtUtc` when an admin has read it). Cascade with the sender. |
 
 A deleted (deactivated) attraction disappears from listings and from guest plans, but its row and
 any `ItineraryStops` that reference it are kept, so no plan data is destroyed.
@@ -146,6 +148,7 @@ All routes are under `/api/v1`. Errors use RFC 7807 problem details with a machi
 | `GET /attractions/{id}/nearby?limit=3` | Closest attractions | Straight-line km, `limit` 1–12. |
 | `GET /categories` | Categories | `[{ slug, name, description }]` |
 | `GET /start-points` | Start presets | `[{ slug, label, description, latitude, longitude, coordinatesApproximate, isDefault }]` |
+| `POST /contact-messages` | Contact form | `{ name, email, subject, message }` (name 2–80, subject 3–120, message 10–2000 chars) → 201 `{ id, receivedAtUtc }`. Messages from the same email (any letter case) are grouped under one contact. 400 for invalid fields, 429 after 5 messages per IP in 10 minutes (`RateLimiting:ContactPermitLimit` / `ContactWindowMinutes`). |
 
 ### Guest itineraries
 
@@ -175,7 +178,12 @@ Google Maps directions link.
 | `POST /auth/login` | `{ email, password }` → `{ accessToken, tokenType, expiresAtUtc, admin }` | 200, 400, 401 (generic message), 429 (5 attempts/min/IP) |
 | `GET /auth/me` | Current admin | 200, 401 |
 | `POST /admin/users` | Create another admin: `{ email, displayName, password }` (password ≥ 12 chars) → `{ id, email, displayName, role }` | 201, 400, 401, 403, 409 `admin-email-taken` |
-| `GET /admin/dashboard` | Totals, per-category counts, guest plan counts | 200, 401, 403 |
+| `GET /admin/dashboard` | Totals, per-category counts, guest plan counts, contact/message/unread counts and the 5 latest messages | 200, 401, 403 |
+| `GET /admin/contacts` | Contacts (one per email) with `messageCount`, `unreadCount`, `lastSubject`, newest first. Query: `q` (name or email), `status` (`all\|unread`), `page`, `pageSize` (1–100, default 20) | 200, 400 |
+| `GET /admin/contacts/{id}` | Contact with all messages, newest first | 200, 404 `contact-not-found` |
+| `PUT /admin/contacts/{id}/read` | `{ isRead }` for every message from the contact → updated contact | 200, 400, 404 |
+| `PUT /admin/contacts/{id}/messages/{messageId}/read` | `{ isRead }` for one message → updated contact | 200, 400, 404 |
+| `DELETE /admin/contacts/{id}` | Permanently delete the contact and their messages | 204, 404 |
 | `GET /admin/attractions/{id}` | Record for the edit form | 200, 404 |
 | `POST /admin/attractions` | Create (`AttractionUpsertRequest`) | 201, 400, 409 `slug-taken` |
 | `PUT /admin/attractions/{id}` | Update | 200, 400, 404, 409 |
@@ -210,5 +218,6 @@ admin account is still active.
 - Deleted attractions can't be restored from the admin UI (set `IsActive = 1` in the database).
 - Admin tokens are short-lived bearer tokens with no refresh token; the Angular app keeps them in
   memory, so reloading the admin page requires signing in again.
-- The contact form on the website is still a frontend-only demo (no API endpoint).
+- Contact-form messages are only shown in the admin area; no email notification is sent and
+  admins reply from their own mail client.
 - Rate limiting is in-memory per instance.

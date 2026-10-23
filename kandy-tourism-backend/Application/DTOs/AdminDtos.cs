@@ -39,4 +39,8 @@ public sealed record AdminDashboardDto(
     int ApproximateCoordinates,
     IReadOnlyList<CategoryCountDto> ByCategory,
     int GuestItineraries,
-    int PlannedStops);
+    int PlannedStops,
+    int Contacts,
+    int ContactMessages,
+    int UnreadMessages,
+    IReadOnlyList<RecentContactMessageDto> RecentMessages);

@@ -6,8 +6,11 @@ namespace KandyTourism.Api.Application.Services;
 public sealed class AdminDashboardService(
     IAttractionRepository attractions,
     ICategoryRepository categories,
-    IItineraryRepository itineraries) : IAdminDashboardService
+    IItineraryRepository itineraries,
+    IContactRepository contacts) : IAdminDashboardService
 {
+    private const int RecentMessageCount = 5;
+
     public async Task<AdminDashboardDto> GetAsync(CancellationToken ct)
     {
         var stats = await attractions.GetStatisticsAsync(ct);
@@ -15,6 +18,7 @@ public sealed class AdminDashboardService(
             .Select(c => new CategoryCountDto(c.Slug, c.Name, stats.CountByCategoryId.GetValueOrDefault(c.Id)))
             .ToList();
         var (guestItineraries, plannedStops) = await itineraries.GetCountsAsync(ct);
+        var messages = await contacts.GetStatisticsAsync(RecentMessageCount, ct);
 
         return new AdminDashboardDto(
             stats.Total,
@@ -23,6 +27,19 @@ public sealed class AdminDashboardService(
             stats.ApproximateCoordinates,
             byCategory,
             guestItineraries,
-            plannedStops);
+            plannedStops,
+            messages.Contacts,
+            messages.Messages,
+            messages.Unread,
+            messages.Recent
+                .Select(m => new RecentContactMessageDto(
+                    m.MessageId,
+                    m.ContactId,
+                    m.Name,
+                    m.Email,
+                    m.Subject,
+                    DateTime.SpecifyKind(m.ReceivedAtUtc, DateTimeKind.Utc),
+                    m.IsRead))
+                .ToList());
     }
 }

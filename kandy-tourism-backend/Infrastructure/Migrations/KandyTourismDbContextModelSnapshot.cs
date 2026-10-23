@@ -273,6 +273,81 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                     b.ToTable("AttractionImages", (string)null);
                 });
 
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.ContactMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("ContactSenderId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ReadAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ReceivedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ReadAtUtc");
+
+                    b.HasIndex("ContactSenderId", "ReceivedAtUtc");
+
+                    b.ToTable("ContactMessages", (string)null);
+                });
+
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.ContactSender", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<DateTime>("FirstContactedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LastMessageAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("NormalizedEmail")
+                        .IsRequired()
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LastMessageAtUtc");
+
+                    b.HasIndex("NormalizedEmail")
+                        .IsUnique();
+
+                    b.ToTable("ContactSenders", (string)null);
+                });
+
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Itinerary", b =>
                 {
                     b.Property<int>("Id")
@@ -438,6 +513,17 @@ namespace KandyTourism.Api.Infrastructure.Migrations
                     b.Navigation("Attraction");
                 });
 
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.ContactMessage", b =>
+                {
+                    b.HasOne("KandyTourism.Api.Domain.Entities.ContactSender", "Sender")
+                        .WithMany("Messages")
+                        .HasForeignKey("ContactSenderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Sender");
+                });
+
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Itinerary", b =>
                 {
                     b.HasOne("KandyTourism.Api.Domain.Entities.Attraction", "StartAttraction")
@@ -482,6 +568,11 @@ namespace KandyTourism.Api.Infrastructure.Migrations
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.AttractionCategory", b =>
                 {
                     b.Navigation("Attractions");
+                });
+
+            modelBuilder.Entity("KandyTourism.Api.Domain.Entities.ContactSender", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("KandyTourism.Api.Domain.Entities.Itinerary", b =>

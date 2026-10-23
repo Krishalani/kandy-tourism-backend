@@ -68,6 +68,49 @@ public interface IAdminUserRepository
     void Add(AdminUser user);
 }
 
+public interface IContactRepository
+{
+    /// <summary>Tracked sender, for adding a message from an email address that has written before.</summary>
+    Task<ContactSender?> GetByNormalizedEmailAsync(string normalizedEmail, CancellationToken ct);
+
+    /// <summary>Senders with message counts, most recently active first.</summary>
+    Task<(IReadOnlyList<ContactListItem> Items, int TotalCount)> SearchAsync(
+        string? search, bool unreadOnly, int page, int pageSize, CancellationToken ct);
+
+    /// <summary>The sender with all messages loaded; tracked when the caller will modify it.</summary>
+    Task<ContactSender?> GetWithMessagesAsync(int id, bool track, CancellationToken ct);
+
+    Task<ContactStatistics> GetStatisticsAsync(int recentCount, CancellationToken ct);
+
+    void Add(ContactSender sender);
+    void Remove(ContactSender sender);
+}
+
+public sealed record ContactListItem(
+    int Id,
+    string Name,
+    string Email,
+    int MessageCount,
+    int UnreadCount,
+    string LastSubject,
+    DateTime FirstContactedAtUtc,
+    DateTime LastMessageAtUtc);
+
+public sealed record RecentContactMessage(
+    int MessageId,
+    int ContactId,
+    string Name,
+    string Email,
+    string Subject,
+    DateTime ReceivedAtUtc,
+    bool IsRead);
+
+public sealed record ContactStatistics(
+    int Contacts,
+    int Messages,
+    int Unread,
+    IReadOnlyList<RecentContactMessage> Recent);
+
 public interface IUnitOfWork
 {
     Task SaveChangesAsync(CancellationToken ct);
