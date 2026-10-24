@@ -186,8 +186,12 @@ public static class ServiceCollectionExtensions
         services.AddExceptionHandler<AppExceptionHandler>();
 
         var origins = configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+        // Development only: dev servers started from an IDE pick a free port (e.g. localhost:57062).
+        var allowAnyLocalhost = configuration.GetValue<bool>("Cors:AllowAnyLocalhost");
         services.AddCors(options => options.AddPolicy(FrontendCorsPolicy, policy => policy
-            .WithOrigins(origins)
+            .SetIsOriginAllowed(origin =>
+                origins.Contains(origin, StringComparer.OrdinalIgnoreCase) ||
+                (allowAnyLocalhost && Uri.TryCreate(origin, UriKind.Absolute, out var uri) && uri.IsLoopback))
             .WithMethods("GET", "POST", "PUT", "DELETE")
             .WithHeaders("Content-Type", "Authorization", "X-Itinerary-Token")
             .SetPreflightMaxAge(TimeSpan.FromMinutes(10))));

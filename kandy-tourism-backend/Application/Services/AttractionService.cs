@@ -20,10 +20,14 @@ public sealed class AttractionService(
 
     public async Task<PagedResult<AttractionSummaryDto>> SearchAsync(AttractionListQuery query, CancellationToken ct)
     {
-        var category = query.Category?.Trim().ToLowerInvariant();
+        var categorySlugs = (query.Category ?? string.Empty)
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(slug => slug.ToLowerInvariant())
+            .Distinct()
+            .ToList();
         var criteria = new AttractionSearchCriteria(
             SearchTextNormalizer.ToTerms(query.Q),
-            string.IsNullOrEmpty(category) || category == "all" ? null : category,
+            categorySlugs.Contains("all") ? [] : categorySlugs,
             ParseDuration(query.Duration),
             query.Featured,
             ParseSort(query.Sort),

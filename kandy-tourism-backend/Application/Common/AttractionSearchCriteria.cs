@@ -21,9 +21,10 @@ public enum AttractionSort
 }
 
 /// <summary>Validated, normalised search parameters passed from the service to the repository.</summary>
+/// <param name="CategorySlugs">Attractions in any of these categories match; empty means every category.</param>
 public sealed record AttractionSearchCriteria(
     IReadOnlyList<string> Terms,
-    string? CategorySlug,
+    IReadOnlyList<string> CategorySlugs,
     DurationFilter Duration,
     bool? Featured,
     AttractionSort Sort,

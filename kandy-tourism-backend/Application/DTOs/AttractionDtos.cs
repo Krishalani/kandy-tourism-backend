@@ -72,8 +72,11 @@ public sealed record AttractionListQuery
     [StringLength(100)]
     public string? Q { get; init; }
 
-    /// <summary>Category slug. Omit or use "all" for every category.</summary>
-    [StringLength(50)]
+    /// <summary>
+    /// One or more category slugs, comma-separated (e.g. <c>religious,nature</c>); an attraction in
+    /// any of them matches. Omit or use "all" for every category.
+    /// </summary>
+    [StringLength(300)]
     public string? Category { get; init; }
 
     /// <summary>any | short (&lt; 1 hr) | medium (1–2 hrs) | long (&gt; 2 hrs).</summary>

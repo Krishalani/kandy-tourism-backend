@@ -13,9 +13,10 @@ public sealed class AttractionRepository(KandyTourismDbContext db) : IAttraction
     {
         var query = db.Attractions.AsNoTracking().Where(a => a.IsActive);
 
-        if (criteria.CategorySlug is { } categorySlug)
+        if (criteria.CategorySlugs.Count > 0)
         {
-            query = query.Where(a => a.Category.Slug == categorySlug);
+            var categorySlugs = criteria.CategorySlugs;
+            query = query.Where(a => categorySlugs.Contains(a.Category.Slug));
         }
         if (criteria.Featured is { } featured)
         {
