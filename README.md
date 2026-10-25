@@ -144,7 +144,7 @@ All routes are under `/api/v1`. Errors use RFC 7807 problem details with a machi
 
 | Method & route | Purpose | Notes |
 |---|---|---|
-| `GET /attractions` | List / search | Query: `q` (≤100 chars; all words must match name, area, category or tags), `category` (slug), `duration` (`any\|short\|medium\|long`), `featured`, `sort` (`recommended\|name\|duration-asc\|duration-desc`), `page` (≥1), `pageSize` (1–100, default 24). Returns `{ items, page, pageSize, totalCount, totalPages, hasNextPage }`. 400 for invalid values. |
+| `GET /attractions` | List / search | Query: `q` (≤100 chars; all words must match name, area, category or tags), `category` (one or more slugs, comma-separated, e.g. `religious,nature`; any of them matches), `duration` (`any\|short\|medium\|long`), `featured`, `sort` (`recommended\|name\|duration-asc\|duration-desc`), `page` (≥1), `pageSize` (1–100, default 24). Returns `{ items, page, pageSize, totalCount, totalPages, hasNextPage }`. 400 for invalid values. |
 | `GET /attractions/{id}` | Details by ID | 404 if missing or deleted. |
 | `GET /attractions/by-slug/{slug}` | Details by slug | Used by `/attractions/:slug`. |
 | `GET /attractions/{id}/nearby?limit=3` | Closest attractions | Straight-line km, `limit` 1–12. |
@@ -221,7 +221,7 @@ admin account is still active.
 |---|---|
 | Startup error about `Jwt:SigningKey` | Check `Jwt:SigningKey` in `appsettings.json` is present and at least 32 characters. |
 | `Cannot open database` / LocalDB errors | `sqllocaldb start MSSQLLocalDB`; check the connection string. |
-| Browser shows "couldn’t reach the server" | Is the API running on port 5201? Is the site's origin in `Cors:AllowedOrigins`? |
+| Browser shows "couldn’t reach the server" | Is the API running on port 5201? Is the site's origin in `Cors:AllowedOrigins`? In Development, `Cors:AllowAnyLocalhost` also allows any `localhost` port (e.g. when Visual Studio starts the site on a random port). |
 | `Msg 1934 … QUOTED_IDENTIFIER` when running SQL by hand | Use the provided script (it sets the option) or `SET QUOTED_IDENTIFIER ON` first. |
 | Garbled ’ or “ characters after running the SQL script | Run sqlcmd with `-f 65001`. |
 
